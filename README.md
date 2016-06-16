@@ -1,7 +1,6 @@
 # Inverse Autoregressive Flow
 
-Code for reproducing key results in the paper "Improving Variational Inference with Inverse Autoregressive Flow" by Diederik P. Kingma, Tim Salimans and Max Welling.
-
+Code for reproducing key results in the paper [Improving Variational Inference with Inverse Autoregressive Flow](http://arxiv.org/abs/1606.04934) by Diederik P. Kingma, Tim Salimans and Max Welling.
 
 ## Prerequisites
 
@@ -22,10 +21,17 @@ git clone https://github.com/openai/iaf.git
 export CIFAR10_PATH="$HOME/cifar-10"
 ```
 
-## To reproduce best result on CIFAR-10
+## Table 2
 
 ```sh
-python train.py with problem=cifar10 n_h=160 depths=[10,10] margs.depth_ar=2 margs.posterior=down_iaf2_nl margs.prio
-r=diag margs.kl_min=0.25
+python train.py with problem=cifar10 n_h=64 depths=[4,4,4,4] margs.depth_ar=1 margs.posterior=down_iaf2_nl margs.prior=diag margs.kl_min=0.25
+```
+
+where `[posterior]` is in `diag`
+
+## Table 3
+
+```sh
+python train.py with problem=cifar10 n_h=160 depths=[10,10] margs.depth_ar=2 margs.posterior=down_iaf2_nl margs.prior=diag margs.kl_min=0.25
 ```
 

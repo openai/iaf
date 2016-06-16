@@ -450,10 +450,7 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
             logsd_x = 0*mean_x + w['logsd_x']
             obj_logpx = N.rand.discretized_logistic(mean_x, logsd_x, 1/256., _x).logp
             #obj_z = T.printing.Print('obj_z')(obj_z)
-            if False and train:
-                obj = 10*obj_logpx - obj_kl
-            else:
-                obj = obj_logpx - obj_kl
+            obj = obj_logpx - obj_kl
             # Compute the bits per pixel
             obj *= (1./np.prod(shape_x) * 1./np.log(2.)).astype('float32')
             
@@ -518,11 +515,6 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
         
         return updates
     
-    count = 0
-    for i in w:
-        count += w[i].get_value().size
-    print "Count: ", count
-
     # Compile init function
     if data_init != None:
         w['__init'] = OrderedDict()
