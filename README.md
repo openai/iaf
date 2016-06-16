@@ -21,17 +21,39 @@ git clone https://github.com/openai/iaf.git
 export CIFAR10_PATH="$HOME/cifar-10"
 ```
 
-## Table 2
+## Syntax of train.py
 
+Example:
 ```sh
-python train.py with problem=cifar10 n_h=64 depths=[4,4,4,4] margs.depth_ar=1 margs.posterior=down_iaf2_nl margs.prior=diag margs.kl_min=0.25
+python train.py with problem=cifar10 n_z=32 n_h=64 depths=[2,2,2] margs.depth_ar=1 margs.posterior=down_iaf2_NL margs.kl_min=0.25
 ```
 
-where `[posterior]` is in `diag`
+`problem` is the problem (dataset) to train on. I only tested `cifar10` for this release.
 
-## Table 3
+`n_z` is the number of stochastic featuremaps in each layer.
+
+`n_h` is the number of deterministic featuremaps used throughout the model.
+
+`depths` denotes the depths of the *levels* in the model. Each level is a sequence of layers. Each subsequent level operates over spatially smaller featuremaps. In case of CIFAR-10, the first level operates over 16x16 featuremaps, the second over 8x8 featuremaps, etc.
+
+Some possible choices for `margs.posterior` are:
+- `up_diag`: bottom-up factorized Gaussian
+- `up_iaf1_nl`: bottom-up IAF, mean-only perturbation
+- `up_iaf2_nl`: bottom-up IAF
+- `down_diag`: top-down factorized Gaussian
+- `down_iaf1_nl`: top-down IAF, mean-only perturbation
+- `down_iaf2_nl`: top-down IAF
+
+`margs.depth_ar` is the number of hidden layers within IAF, and can be any non-negative integer.
+
+`margs.kl_min`: the minimum information constraint. Should be a non-negative float (where 0 is no constraint).
+
+## Results of Table 3
+
+(3.28 bits/dim)
 
 ```sh
 python train.py with problem=cifar10 n_h=160 depths=[10,10] margs.depth_ar=2 margs.posterior=down_iaf2_nl margs.prior=diag margs.kl_min=0.25
 ```
 
+More instructions will follow.
