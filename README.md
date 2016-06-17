@@ -1,4 +1,4 @@
-# Inverse Autoregressive Flow
+# Improve Variational Inference with Inverse Autoregressive Flow
 
 Code for reproducing key results in the paper [Improving Variational Inference with Inverse Autoregressive Flow](http://arxiv.org/abs/1606.04934) by Diederik P. Kingma, Tim Salimans and Max Welling.
 
@@ -34,7 +34,7 @@ python train.py with problem=cifar10 n_z=32 n_h=64 depths=[2,2,2] margs.depth_ar
 
 `n_h` is the number of deterministic featuremaps used throughout the model.
 
-`depths` denotes the depths of the *levels* in the model. Each level is a sequence of layers. Each subsequent level operates over spatially smaller featuremaps. In case of CIFAR-10, the first level operates over 16x16 featuremaps, the second over 8x8 featuremaps, etc.
+`depths` is an array of integers that denotes the depths of the *levels* in the model. Each level is a sequence of layers. Each subsequent level operates over spatially smaller featuremaps. In case of CIFAR-10, the first level operates over 16x16 featuremaps, the second over 8x8 featuremaps, etc.
 
 Some possible choices for `margs.posterior` are:
 - `up_diag`: bottom-up factorized Gaussian

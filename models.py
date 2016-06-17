@@ -205,14 +205,21 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
             _qz = N.rand.gaussian_diag(qz[0].mean + rz_mean, qz[0].logvar + 2*rz_logsd)
             z = _qz.sample
             logqs = _qz.logps
+#         elif posterior == 'down_bernoulli':
+#             assert prior == 'bernoulli'
+#             rz_p = bernoulli_p(h[:,n_conv_down_prior:n_conv_down_prior+n_z,:,:] + qz[0].mean)
+#             if train:
+#                 rz_var = rz_p * (1-rz_p)
+#                 z01 = rz_p + T.sqrt(rz_var) * G.rng_curand.normal(size=rz_var.shape)
+#             else:
+#                 z01 = N.rand.bernoulli(rz_p).sample
+#             logqs = z01 * T.log(rz_p) + (1.-z01) * T.log(1.-rz_p)
+#             z = 2*z01-1
+#             z = prior_conv1(z, w)
         elif posterior == 'down_bernoulli':
             assert prior == 'bernoulli'
             rz_p = bernoulli_p(h[:,n_conv_down_prior:n_conv_down_prior+n_z,:,:] + qz[0].mean)
-            if train:
-                rz_var = rz_p * (1-rz_p)
-                z01 = rz_p + T.sqrt(rz_var) * G.rng_curand.normal(size=rz_var.shape)
-            else:
-                z01 = N.rand.bernoulli(rz_p).sample
+            z01 = mixture2bernoullis(rz_p, )
             logqs = z01 * T.log(rz_p) + (1.-z01) * T.log(1.-rz_p)
             z = 2*z01-1
             z = prior_conv1(z, w)
@@ -433,12 +440,8 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
                 results['cost_z'+str(i).zfill(3)+'_'+str(j).zfill(3)] = kl_sum
                 # Constraint: Minimum number of bits per featuremap, averaged across minibatch
                 if kl_min > 0:
-                    if False:
-                        kl = kl.sum(axis=(2,3)).mean(axis=0,dtype=G.floatX)
-                        obj_kl += T.maximum(np.asarray(kl_min,G.floatX), kl).sum(dtype=G.floatX)
-                    else:
-                        kl = T.maximum(np.asarray(kl_min,G.floatX), kl.sum(axis=(2,3))).sum(axis=1,dtype=G.floatX)
-                        obj_kl += kl
+                    kl = kl.sum(axis=(2,3)).mean(axis=0,dtype=G.floatX)
+                    obj_kl += T.maximum(np.asarray(kl_min,G.floatX), kl).sum(dtype=G.floatX)
                 else:
                     obj_kl += kl_sum
         
