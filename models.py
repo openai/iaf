@@ -204,26 +204,7 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
             rz_logsd = h[:,n_conv_down_prior+n_z:n_conv_down_prior+2*n_z,:,:]
             _qz = N.rand.gaussian_diag(qz[0].mean + rz_mean, qz[0].logvar + 2*rz_logsd)
             z = _qz.sample
-            logqs = _qz.logps
-#         elif posterior == 'down_bernoulli':
-#             assert prior == 'bernoulli'
-#             rz_p = bernoulli_p(h[:,n_conv_down_prior:n_conv_down_prior+n_z,:,:] + qz[0].mean)
-#             if train:
-#                 rz_var = rz_p * (1-rz_p)
-#                 z01 = rz_p + T.sqrt(rz_var) * G.rng_curand.normal(size=rz_var.shape)
-#             else:
-#                 z01 = N.rand.bernoulli(rz_p).sample
-#             logqs = z01 * T.log(rz_p) + (1.-z01) * T.log(1.-rz_p)
-#             z = 2*z01-1
-#             z = prior_conv1(z, w)
-        elif posterior == 'down_bernoulli':
-            assert prior == 'bernoulli'
-            rz_p = bernoulli_p(h[:,n_conv_down_prior:n_conv_down_prior+n_z,:,:] + qz[0].mean)
-            z01 = mixture2bernoullis(rz_p, )
-            logqs = z01 * T.log(rz_p) + (1.-z01) * T.log(1.-rz_p)
-            z = 2*z01-1
-            z = prior_conv1(z, w)
-                
+            logqs = _qz.logps                
         elif posterior == 'down_tim':
             assert prior == 'diag'
             pz_mean = h[:,n_h2:n_h2+n_z,:,:]
@@ -317,9 +298,6 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
         
         output = input + .1 * down_conv2(down_nl2(h, w), w)
         
-        #output = T.printing.Print(name+' output')(output)
-        #logq = T.printing.Print(name+' logq')(logq)
-        #logp = T.printing.Print(name+' logp')(logp)
         
         return output, logqs - logps
     
@@ -440,8 +418,12 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
                 results['cost_z'+str(i).zfill(3)+'_'+str(j).zfill(3)] = kl_sum
                 # Constraint: Minimum number of bits per featuremap, averaged across minibatch
                 if kl_min > 0:
-                    kl = kl.sum(axis=(2,3)).mean(axis=0,dtype=G.floatX)
-                    obj_kl += T.maximum(np.asarray(kl_min,G.floatX), kl).sum(dtype=G.floatX)
+                    if True:
+                        kl = kl.sum(axis=(2,3)).mean(axis=0,dtype=G.floatX)
+                        obj_kl += T.maximum(np.asarray(kl_min,G.floatX), kl).sum(dtype=G.floatX)
+                    else:
+                        kl = T.maximum(np.asarray(kl_min,G.floatX), kl.sum(axis=(2,3))).sum(axis=1,dtype=G.floatX)
+                        obj_kl += kl
                 else:
                     obj_kl += kl_sum
         
@@ -449,7 +431,7 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
         
         # empirical distribution
         if px == 'logistic':
-            mean_x = T.clip(output+.5, 0, 1)
+            mean_x = T.clip(output+.5, 0+1/512., 1-1/512.)
             logsd_x = 0*mean_x + w['logsd_x']
             obj_logpx = N.rand.discretized_logistic(mean_x, logsd_x, 1/256., _x).logp
             #obj_z = T.printing.Print('obj_z')(obj_z)

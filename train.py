@@ -139,7 +139,7 @@ def get_data(problem, n_train, n_batch):
     return data_train, data_valid, data_init
 
 @ex.automain
-def train(problem, n_batch, n_train, n_reporting, save_model, est_marglik, margs):
+def train(shape_x, problem, n_batch, n_train, n_reporting, save_model, est_marglik, margs):
     
     global logpath
     
@@ -154,14 +154,17 @@ def train(problem, n_batch, n_train, n_reporting, save_model, est_marglik, margs
     
     # Estimate the marginal likelihood
     if est_marglik > 0:
+        # Correction since model's actual cost is divided by this factor
+        correctionfactor = - (np.prod(shape_x) * np.log(2.))
         obj_test = []
         for i in range(est_marglik):
-            obj_test.append(model.eval(data_valid, n_batch))
+            cost = model.eval(data_valid, n_batch=n_batch)['cost'] * correctionfactor
+            obj_test.append(cost)
             _obj = np.vstack(obj_test)
             _max = np.max(_obj, axis=0)
             _est = np.log(np.exp(_obj - _max).mean(axis=0)) + _max
-            if i%100 == 0:
-                print 'Estimate of logp(x) after', i+1, 'samples:', _est.mean()
+            if i%1 == 0:
+                print 'Estimate of logp(x) after', i+1, 'samples:', _est.mean() / correctionfactor
         raise Exception()
         sys.exit()
     
