@@ -12,7 +12,7 @@ from pyexpat import model
 floatX = theano.config.floatX # @UndefinedVariable
 
 # CVAE ResNet layer of deterministic and stochastic units
-def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl, kernel, weightsharing, w):
+def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl, kernel, weightsharing, downsample_type, w):
     
     if False:
         # New such that we can recognize variational params later
@@ -107,6 +107,9 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
     ds = 1
     if downsample:
         ds = 2
+        if downsample_type == 'conv':
+            up_conv3 = N.conv.conv2d(name_q+'_up_conv3', n_h1, n_h1, kernel, downsample=ds, w=w)
+            down_conv3 = N.conv.conv2d(name_q+'_down_conv3', n_h1, n_h1, kernel, upsample=ds, w=w)
     
     up_nl1 = N.nonlinearity(name_q+"_up_nl1", nl)
     up_conv1 = N.conv.conv2d(name_q+'_up_conv1_'+str(ds), n_h1, n_conv_up1, kernel, downsample=ds, w=w)
@@ -171,7 +174,10 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
         else:
             raise Exception()
         if downsample:
-            input = N.conv.downsample2d_nearest_neighbour(input, 2)
+            if downsample_type == 'nn':
+                input = N.conv.downsample2d_nearest_neighbour(input, 2)
+            elif downsample_type == 'conv':
+                input = up_conv3(input, w)
         output = input + .1 * up_conv2(up_nl2(h, w), w)
         up_output[0] = output
 
@@ -294,7 +300,10 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
         h_det = h[:,:n_h2,:,:]
         h = T.concatenate([h_det, z], axis=1)
         if downsample:
-            input = N.conv.upsample2d_nearest_neighbour(input)
+            if downsample_type == 'nn':
+                input = N.conv.upsample2d_nearest_neighbour(input)
+            elif downsample_type == 'conv':
+                input = down_conv3(input, w)
         
         output = input + .1 * down_conv2(down_nl2(h, w), w)
         
@@ -324,12 +333,18 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
         
         h = T.concatenate([h_det, z], axis=1)
         if downsample:
-            input = N.conv.upsample2d_nearest_neighbour(input)
+            if downsample_type == 'nn':
+                input = N.conv.upsample2d_nearest_neighbour(input)
+            elif downsample_type == 'conv':
+                input = down_conv3(input, w)
+            
         output = input + .1 * down_conv2(down_nl2(h, w), w)
         return output
         
     def postup(updates, w):
         modules = [up_conv1,up_conv2,down_conv1,down_conv2]
+        if downsample and downsample_type == 'conv':
+            modules += [up_conv3,down_conv3]
         if prior_conv1 != None:
             modules.append(prior_conv1)
         if posterior_conv1 != None:
@@ -343,7 +358,7 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
 # Conv VAE
 # - Hybrid deterministic/stochastic ResNet block per layer
 
-def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='down_diag', px='logistic', nl='softplus', kernel_x=(5,5), kernel_h=(3,3), kl_min=0, optim='adamax', alpha=0.002, beta1=0.1, beta3=0.01, weightsharing=None, pad_x = 0, data_init=None):
+def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='down_diag', px='logistic', nl='softplus', kernel_x=(5,5), kernel_h=(3,3), kl_min=0, optim='adamax', alpha=0.002, beta1=0.1, beta2=0.001, weightsharing=None, pad_x = 0, data_init=None, downsample_type='nn'):
     _locals = locals()
     _locals.pop('data_init')
     print 'CVAE1 with ', _locals
@@ -378,7 +393,7 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
                 name = '[sharedw]'+str(i)+'[/sharedw]'+'_'+str(j)
             else:
                 raise Exception()
-            layers[i].append(cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl, kernel_h, False, w))
+            layers[i].append(cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl, kernel_h, False, downsample_type, w))
     
     # top-level value
     w['h_top'] = G.sharedf(np.zeros((n_h1,)))
@@ -427,7 +442,7 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
                 else:
                     obj_kl += kl_sum
         
-        output = x_dec(x_dec_nl(h, w), w)
+        output = .1 * x_dec(x_dec_nl(h, w), w)
         
         # empirical distribution
         if px == 'logistic':
@@ -441,7 +456,6 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
             
             #if not '__init' in w:
             #    raise Exception()
-            
         
         elif px == 'bernoulli':
             prob_x = T.nnet.sigmoid(output)
@@ -454,7 +468,7 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
             #obj_logpx = T.printing.Print('obj_logpx')(obj_logpx)
             obj = obj_logpx - obj_kl
             #obj = T.printing.Print('obj')(obj)
-            
+        
         results['cost_x'] = -obj_logpx
         results['cost'] = -obj
         return results
@@ -470,7 +484,7 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
             for j in list(reversed(range(depths[i]))):
                 h = layers[i][j].down_p(h, eps['eps_'+str(i)+'_'+str(j)], w)
         
-        output = x_dec(x_dec_nl(h, w), w)
+        output = .1 * x_dec(x_dec_nl(h, w), w)
         
         if px == 'logistic':
             mean_x = T.clip(output+.5, 0+1/512., 1-1/512.)
@@ -528,10 +542,10 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
     def f_train():
         if optim == 'adamax':
             train_cost = f_encode_decode(w)['cost']
-            updates = G.misc.optim.AdaMaxAvg([w],[w_avg], train_cost, alpha=-alpha, beta1=beta1, beta3=beta3, disconnected_inputs='ignore')
+            updates = G.misc.optim.AdaMaxAvg([w],[w_avg], train_cost, alpha=-alpha, beta1=beta1, beta2=beta2, disconnected_inputs='ignore')
         elif optim == 'eve':
             f = lambda w: f_encode_decode(w)['cost']
-            train_cost, updates = G.misc.optim.Eve(w, w_avg, f, alpha=-alpha, beta1=beta1, beta3=beta3, disconnected_inputs='ignore')
+            train_cost, updates = G.misc.optim.Eve(w, w_avg, f, alpha=-alpha, beta1=beta1, beta2=beta2, disconnected_inputs='ignore')
         updates = postup(updates, w)
         return G.function({'x':x}, train_cost, updates=updates, lazy=lazy)    
 
@@ -541,7 +555,7 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
         for i in w:
             if '_q_' in i: keys_q.append(i)
         train_cost = f_encode_decode(w)['cost']
-        updates = G.misc.optim.AdaMaxAvg([w],None, train_cost, alpha=-alpha, beta1=beta1, beta3=beta3, update_keys=keys_q, disconnected_inputs='ignore')
+        updates = G.misc.optim.AdaMaxAvg([w],None, train_cost, alpha=-alpha, beta1=beta1, beta2=beta2, update_keys=keys_q, disconnected_inputs='ignore')
         updates = postup(updates, w)
         return G.function({'x':x}, train_cost, updates=updates, lazy=lazy)    
     
@@ -575,7 +589,7 @@ def cvae1(shape_x, depths, depth_ar, n_h1, n_h2, n_z, prior='diag', posterior='d
 # Fully-connected VAE
 # - Hybrid deterministic/stochastic ResNet block per layer
 
-def fcvae(shape_x, depth_model, depth_ar, n_h1, n_h2, n_z, posterior, px='logistic', nl='softplus', alpha=0.002, beta1=0.1, beta3=0.01, share_w=False, data_init=None):
+def fcvae(shape_x, depth_model, depth_ar, n_h1, n_h2, n_z, posterior, px='logistic', nl='softplus', alpha=0.002, beta1=0.1, beta2=0.001, share_w=False, data_init=None):
     _locals = locals()
     _locals.pop('data_init')
     print 'CVAE9 with ', _locals
@@ -636,7 +650,7 @@ def fcvae(shape_x, depth_model, depth_ar, n_h1, n_h2, n_z, posterior, px='logist
             obj_logpz += _obj_logpz
             results['cost_z'+str(i).zfill(3)] = _obj_logqz - _obj_logpz
         
-        output = x_dec(x_dec_nl(h, w), w).reshape((-1,shape_x[0],shape_x[1],shape_x[2]))
+        output = .1 * x_dec(x_dec_nl(h, w), w).reshape((-1,shape_x[0],shape_x[1],shape_x[2]))
         
         # empirical distribution
         if px == 'logistic':
@@ -685,7 +699,7 @@ def fcvae(shape_x, depth_model, depth_ar, n_h1, n_h2, n_z, posterior, px='logist
         for i in list(reversed(range(depth_model))):
             h = layers[i].down_p(h, eps['eps_'+str(i)], w)
         
-        output = x_dec(x_dec_nl(h, w), w).reshape((-1,shape_x[0],shape_x[1],shape_x[2]))
+        output = .1 * x_dec(x_dec_nl(h, w), w).reshape((-1,shape_x[0],shape_x[1],shape_x[2]))
         if px == 'logistic':
             mean_x = T.clip(output[:,:,:,:] + .5, 0, 1)
         elif px == 'bernoulli':
@@ -717,7 +731,7 @@ def fcvae(shape_x, depth_model, depth_ar, n_h1, n_h2, n_z, posterior, px='logist
     
     # Compile training function
     results = f_cost(w)
-    updates, (w_avg,) = G.misc.optim.AdaMaxAvg([w], results['cost'], alpha=-alpha, beta1=beta1, beta3=beta3, disconnected_inputs='ignore')
+    updates, (w_avg,) = G.misc.optim.AdaMaxAvg([w], results['cost'], alpha=-alpha, beta1=beta1, beta2=beta2, disconnected_inputs='ignore')
     #todo: replace postup with below
     #w['_updates'] = updates
     #f_cost(w)

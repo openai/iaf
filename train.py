@@ -13,29 +13,34 @@ def config():
     n_reporting = 10 #epochs between reporting
     px = 'logistic'
     pad_x = 0
-    n_h = 160
-    n_h1 = n_h
-    n_h2 = n_h
-    n_z = 32
-    
+
     # datatype
     problem = 'cifar10'
+    n_batch = 16 # Minibatch size
     if problem == 'mnist':
         shape_x = (1,28,28)
         px = 'bernoulli'
         pad_x = 2
         n_h = 64
+        n_z = 32
     if problem == 'cifar10':
         shape_x = (3,32,32)
+        n_h = 160
+        n_z = 32
     if problem == 'svhn':
         shape_x = (3,32,32)
         n_reporting = 1
+        n_h = 160
+        n_z = 32
     if problem == 'lfw':
         shape_x = (3,64,48)
-    
+        n_h = 160
+        n_z = 32
+
+    n_h1 = n_h
+    n_h2 = n_h
+
     # dataset
-    n_batch = 16 # Minibatch size
-    n_accum = 1
     n_train = 0
     
     # model
@@ -63,8 +68,31 @@ def config():
             'pad_x': pad_x,
             'weightsharing': False,
             'depth_ar': 2,
+            'downsample_type': 'nn'
         }
     
+    if model_type == 'simplecvae1':
+        depths = [2,2,2]
+        widths = [32,64,128]
+        
+        margs = {
+            'shape_x': shape_x,
+            'depths': depths,
+            'widths': widths,
+            'n_z': n_z,
+            'prior': 'diag',
+            'posterior': 'down_diag',
+            'px': px,
+            'nl': 'elu',
+            'kernel_x': (5,5),
+            'kernel_h': (3,3),
+            'kl_min': 0.25,
+            'optim': 'adamax',
+            'alpha': 0.002,
+            'beta1': 0.1,
+            'pad_x': pad_x,
+            'weightsharing': False
+        }
     
     # model loading/saving
     save_model = True
@@ -73,7 +101,7 @@ def config():
     
     # Estimate the marginal likelihood
     est_marglik = 0.
-    
+    est_marglik_data = 'valid'
     
 def init_logs():
     global logpath, logdir
@@ -98,10 +126,14 @@ def construct_model(data_init, model_type, margs, load_model_path, load_model_co
         model = models.fcvae(**margs)
     if model_type == 'cvae1':
         model = models.cvae1(**margs)
-        
+    if model_type == 'simplecvae1':
+        import simplemodel
+        model = simplemodel.simplecvae1(**margs)
+    
     if load_model_path != None:
         print 'Loading existing model at '+load_model_path
         _w = G.ndict.np_loadz(load_model_path+'/weights.ndict.tar.gz')
+                
         G.ndict.set_value(model.w, _w, load_model_complete)
         G.ndict.set_value(model.w_avg, _w, load_model_complete)
     
@@ -139,7 +171,7 @@ def get_data(problem, n_train, n_batch):
     return data_train, data_valid, data_init
 
 @ex.automain
-def train(shape_x, problem, n_batch, n_train, n_reporting, save_model, est_marglik, margs):
+def train(shape_x, problem, n_batch, n_train, n_reporting, save_model, est_marglik, est_marglik_data, margs):
     
     global logpath
     
@@ -154,11 +186,15 @@ def train(shape_x, problem, n_batch, n_train, n_reporting, save_model, est_margl
     
     # Estimate the marginal likelihood
     if est_marglik > 0:
+        if est_marglik_data == 'valid':
+            data = data_valid
+        elif est_marglik_data == 'train':
+            data = data_train
         # Correction since model's actual cost is divided by this factor
         correctionfactor = - (np.prod(shape_x) * np.log(2.))
         obj_test = []
         for i in range(est_marglik):
-            cost = model.eval(data_valid, n_batch=n_batch)['cost'] * correctionfactor
+            cost = model.eval(data, n_batch=n_batch, randomorder=False)['cost'] * correctionfactor
             obj_test.append(cost)
             _obj = np.vstack(obj_test)
             _max = np.max(_obj, axis=0)

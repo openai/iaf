@@ -17,6 +17,7 @@ import graphy.nodes as N
 
 # hyperparams
 logscale = True #Really works better!
+bias_logscale = False
 logscale_scale = 3.
 init_stdev = .1
 maxweight = 0.
@@ -173,6 +174,8 @@ def conv2d(name, n_in, n_out, size_kernel=(3,3), pad_channel=True, border_mode='
             w[name_w+'_w'].set_value(maxconstraint(w[name_w+'_w']).tag.test_value)
     
     w[name+'_b'] = G.sharedf(np.zeros((_n_out,)))
+    if bias_logscale:
+        w[name+'_bs'] = G.sharedf(0.)
     
     if l2norm:
         if logscale:
@@ -214,8 +217,11 @@ def conv2d(name, n_in, n_out, size_kernel=(3,3), pad_channel=True, border_mode='
         if bn: 
             h -= h.mean(axis=(0,2,3), keepdims=True)
         
-        h += w[name+'_b'].dimshuffle('x',0,'x','x')
-
+        _b = w[name+'_b'].dimshuffle('x',0,'x','x')
+        if bias_logscale:
+            _b *= T.exp(logscale_scale * w[name+'_bs'])
+        h += _b
+        
         if '__init' in w and datainit:
             
             # Std

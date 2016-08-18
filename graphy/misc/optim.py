@@ -96,8 +96,8 @@ def AdaMax2(w, objective, alpha=.01, beta1=.1, beta2=.001, n_accum=2):
     return new
 
 # AdaMax that keeps running average of parameter
-def AdaMaxAvg(ws, ws_avg, objective, alpha=.01, beta1=.1, beta2=.001, beta3=0.01, update_keys=None, disconnected_inputs='raise'):
-    print 'AdaMax_Avg', 'alpha:',alpha,'beta1:',beta1,'beta2:',beta2,'beta3:',beta3
+def AdaMaxAvg(ws, ws_avg, objective, alpha=.01, beta1=.1, beta2=.001, update_keys=None, disconnected_inputs='raise'):
+    print 'AdaMax_Avg', 'alpha:',alpha,'beta1:',beta1,'beta2:',beta2
     
     gs = G.ndict.T_grad(objective.sum(), ws, disconnected_inputs=disconnected_inputs) #warn/raise
     
@@ -119,7 +119,7 @@ def AdaMaxAvg(ws, ws_avg, objective, alpha=.01, beta1=.1, beta2=.001, beta3=0.01
             new[_max] = T.maximum((1-beta2)*_max, abs(_g) + 1e-8)
             new[_w] = _w + alpha *  new[mom1] / new[_max]
             if ws_avg is not None:
-                new[w_avg[i]] = beta3 * _w + (1.-beta3) * w_avg[i]
+                new[w_avg[i]] = beta2 * _w + (1.-beta2) * w_avg[i]
     return new
 
 # Eve that keeps running average of parameter
