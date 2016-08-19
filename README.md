@@ -64,9 +64,9 @@ More instructions will follow.
 ### Prerequisites
 
 Make sure that recent versions installed of:
-    - Python (version 2.7 or higher)
-    - TensorFlow
-    - tqdm
+- Python (version 2.7 or higher)
+- TensorFlow
+- tqdm
    
 `CIFAR10_PATH` environment variable should point to the dataset location.
 
