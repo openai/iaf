@@ -57,3 +57,53 @@ python train.py with problem=cifar10 n_h=160 depths=[10,10] margs.depth_ar=2 mar
 ```
 
 More instructions will follow.
+
+
+## Multi-GPU TensorFlow implementation
+
+### Prerequisites
+
+Make sure that recent versions installed of:
+    - Python (version 2.7 or higher)
+    - TensorFlow
+    - tqdm
+   
+`CIFAR10_PATH` environment variable should point to the dataset location.
+
+### Syntax of tf_train.py
+
+Training script:
+```sh
+python tf_train.py --logdir <logdir> --hpconfig depth=1,num_blocks=20,kl_min=0.1,learning_rate=0.002,batch_size=32 --num_gpus 8 --mode train
+```
+
+It will run the training procedure on a given number of GPUs. Model checkpoints will be stored in `<logdir>/train` directory along with TensorBoard summaries that are useful for monitoring and debugging issues.
+
+Evaluation script:
+```sh
+python tf_train.py --logdir <logdir> --hpconfig depth=1,num_blocks=20,kl_min=0.1,learning_rate=0.002,batch_size=32 --num_gpus 1 --mode eval_test
+```
+
+It will run the evaluation on the test set using a single GPU and will produce TensorBoard summary with the results and generated samples.
+
+To start TensorBoard:
+```sh
+tensorboard --logdir <logdir>
+```
+
+For the description of hyper-parameters, take a look at `get_default_hparams` function in `tf_train.py`.
+
+
+### Loading from the checkpoint
+
+The best IAF model trained on CIFAR-10 reached 3.15 bits/dim when evaluated with a single sample. With 1,0000 samples, the estimation of the log likelihood is 3.111 bits/dim.
+The checkpoint is available at [link](https://drive.google.com/file/d/0B-pv8mYT4p0OOXFfWElyeUs0bUk/view?usp=sharing).
+Steps to use it:
+- download the file
+- create directory `<logdir>/train/` and copy the checkpoint there
+- run the following command:
+```sh
+python tf_train.py --logdir <logdir> --hpconfig depth=1,num_blocks=20,kl_min=0.1,learning_rate=0.002,batch_size=32 --num_gpus 1 --mode eval_test
+```
+
+The script will run the evaluation on the test set and generate samples stored in the events file that can be accessed using TensorBoard.
