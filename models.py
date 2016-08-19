@@ -25,6 +25,7 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
     n_conv_up1 = n_h2+2*n_z
     n_conv_up2 = n_h2+n_z
     
+    n_conv_down_posterior = 0
     n_conv_down_prior = n_h2+2*n_z
     
     # Prior
@@ -43,6 +44,9 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
     
     # Posterior
     posterior_conv1 = None
+    posterior_conv2 = None
+    posterior_conv3 = None
+    posterior_conv4 = None
     
     if posterior == 'up_diag':
         pass
@@ -86,6 +90,12 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
         n_conv_up2 = n_h2
         n_conv_down_posterior = 2*n_z+n_h2
         posterior_conv1 = N.ar.multiconv2d(name_q+'_posterior_conv1', n_z, depth_ar*[n_h2], [n_z,n_z], kernel, False, nl=nl, w=w)
+    elif posterior == 'down_iaf2_nl2':
+        n_conv_up1 = n_h2+2*n_z+n_h2
+        n_conv_up2 = n_h2
+        n_conv_down_posterior = 2*n_z+n_h2
+        posterior_conv1 = N.ar.multiconv2d(name_q+'_posterior_conv1', n_z, depth_ar*[n_h2], [n_z,n_z], kernel, False, nl=nl, w=w)
+        posterior_conv2 = N.ar.multiconv2d(name_q+'_posterior_conv2', n_z, depth_ar*[n_h2], [n_z,n_z], kernel, True, nl=nl, w=w)
     elif posterior == 'down_iaf1_deep':
         n_conv_up1 = n_h2+2*n_z+n_h2
         n_conv_up2 = n_h2
@@ -166,7 +176,7 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
             h = T.concatenate([h_det,qz[0].sample],axis=1)
         elif posterior == 'down_tim':
             h = T.concatenate([h_det,qz[0].mean],axis=1)
-        elif posterior in ['down_iaf1_nl','down_iaf2_nl','down_iaf1_deep','down_iaf2_deep']:
+        elif posterior in ['down_iaf1_nl','down_iaf2_nl','down_iaf2_nl2','down_iaf1_deep','down_iaf2_deep']:
             up_context[0] = h[:,n_h2+2*n_z:n_h2+2*n_z+n_h2]
             h = h_det
         elif posterior in ['down_diag','down_iaf1','down_iaf2','down_bernoulli']:
@@ -204,7 +214,7 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
         # posterior
         if posterior in ['up_diag','up_iaf1','up_iaf2','up_iaf1_nl','up_iaf2_nl']:
             z = qz[0].sample
-            logqs = qz[0].logp
+            logqs = qz[0].logps
         elif posterior == 'down_diag':
             rz_mean = h[:,n_conv_down_prior:n_conv_down_prior+n_z,:,:]
             rz_logsd = h[:,n_conv_down_prior+n_z:n_conv_down_prior+2*n_z,:,:]
@@ -259,7 +269,7 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
             arw_mean = posterior_conv1(z, context, w)
             arw_mean *= .1
             z = (z - arw_mean)
-        elif posterior in ['down_iaf2_nl','down_iaf2_deep']:
+        elif posterior in ['down_iaf2_nl','down_iaf2_nl2','down_iaf2_deep']:
             rz_mean = h[:,n_conv_down_prior:n_conv_down_prior+n_z,:,:]
             rz_logsd = h[:,n_conv_down_prior+n_z:n_conv_down_prior+2*n_z,:,:]
             _qz = N.rand.gaussian_diag(qz[0].mean + rz_mean, qz[0].logvar + 2*rz_logsd)
@@ -273,6 +283,13 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
             arw_logsd *= .1
             z = (z - arw_mean) / T.exp(arw_logsd)
             logqs += arw_logsd
+            if posterior == 'down_iaf2_nl2':
+                arw_mean, arw_logsd = posterior_conv2(z, context, w)
+                arw_mean *= .1
+                arw_logsd *= .1
+                z = (z - arw_mean) / T.exp(arw_logsd)
+                logqs += arw_logsd
+            
         
         # Prior
         if prior == 'diag':
@@ -349,6 +366,12 @@ def cvae_layer(name, prior, posterior, n_h1, n_h2, n_z, depth_ar, downsample, nl
             modules.append(prior_conv1)
         if posterior_conv1 != None:
             modules.append(posterior_conv1)
+        if posterior_conv2 != None:
+            modules.append(posterior_conv2)
+        if posterior_conv3 != None:
+            modules.append(posterior_conv3)
+        if posterior_conv3 != None:
+            modules.append(posterior_conv4)
         for m in modules:
             updates = m.postup(updates, w)
         return updates

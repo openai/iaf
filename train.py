@@ -13,7 +13,7 @@ def config():
     n_reporting = 10 #epochs between reporting
     px = 'logistic'
     pad_x = 0
-
+    
     # datatype
     problem = 'cifar10'
     n_batch = 16 # Minibatch size
@@ -67,7 +67,7 @@ def config():
             'beta1': 0.1,
             'pad_x': pad_x,
             'weightsharing': False,
-            'depth_ar': 2,
+            'depth_ar': 1,
             'downsample_type': 'nn'
         }
     
