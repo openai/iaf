@@ -96,7 +96,7 @@ For the description of hyper-parameters, take a look at `get_default_hparams` fu
 
 ### Loading from the checkpoint
 
-The best IAF model trained on CIFAR-10 reached 3.15 bits/dim when evaluated with a single sample. With 1,0000 samples, the estimation of the log likelihood is 3.111 bits/dim.
+The best IAF model trained on CIFAR-10 reached 3.15 bits/dim when evaluated with a single sample. With 10,000 samples, the estimation of log likelihood is 3.111 bits/dim.
 The checkpoint is available at [link](https://drive.google.com/file/d/0B-pv8mYT4p0OOXFfWElyeUs0bUk/view?usp=sharing).
 Steps to use it:
 - download the file
@@ -106,4 +106,4 @@ Steps to use it:
 python tf_train.py --logdir <logdir> --hpconfig depth=1,num_blocks=20,kl_min=0.1,learning_rate=0.002,batch_size=32 --num_gpus 1 --mode eval_test
 ```
 
-The script will run the evaluation on the test set and generate samples stored in the events file that can be accessed using TensorBoard.
+The script will run the evaluation on the test set and generate samples stored in TensorFlow events file that can be accessed using TensorBoard.
