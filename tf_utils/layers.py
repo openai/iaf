@@ -57,7 +57,7 @@ def conv2d(name, x, num_filters, filter_size=(3, 3), stride=(1, 1), pad="SAME", 
                 v = mask * v
 
             # use weight normalization (Salimans & Kingma, 2016)
-            w = tf.reshape(tf.exp(g), [1, 1, 1, num_filters]) * tf.nn.l2_normalize(v, [0, 1, 2])
+            w = tf.reshape(tf.exp(3.0 * g), [1, 1, 1, num_filters]) * tf.nn.l2_normalize(v, [0, 1, 2])
 
             # calculate convolutional layer output
             b = tf.reshape(b, [1, -1, 1, 1])
@@ -67,7 +67,7 @@ def conv2d(name, x, num_filters, filter_size=(3, 3), stride=(1, 1), pad="SAME", 
 def my_deconv2d(x, filters, strides):
     input_shape = x.get_shape()
     output_shape = [int(input_shape[0]), int(filters.get_shape()[2]),
-                    int(input_shape[2] * strides[2]), int(input_shape[2] * strides[3])]
+                    int(input_shape[2] * strides[2]), int(input_shape[3] * strides[3])]
     x = tf.transpose(x, (0, 2, 3, 1))  # go to NHWC data layout
     output_shape = [output_shape[0], output_shape[2], output_shape[3], output_shape[1]]
     strides = [strides[0], strides[2], strides[3], strides[1]]
@@ -90,7 +90,7 @@ def deconv2d(name, x, num_filters, filter_size=(3, 3), stride=(2, 2), pad="SAME"
             if mask is not None:  # Used for auto-regressive convolutions.
                 v = mask * v
 
-            v_norm = tf.nn.l2_normalize(v, [0, 1, 2])
+            v_norm = tf.nn.l2_normalize(v, [0, 1, 3])
             x_init = my_deconv2d(x, v_norm, stride_shape)
             m_init, v_init = tf.nn.moments(x_init, [0, 2, 3])
             scale_init = init_scale / tf.sqrt(v_init + 1e-10)
@@ -105,7 +105,7 @@ def deconv2d(name, x, num_filters, filter_size=(3, 3), stride=(2, 2), pad="SAME"
                 v = mask * v
 
             # use weight normalization (Salimans & Kingma, 2016)
-            w = tf.reshape(tf.exp(g), [1, 1, num_filters, 1]) * tf.nn.l2_normalize(v, [0, 1, 2])
+            w = tf.reshape(tf.exp(3.0 * g), [1, 1, num_filters, 1]) * tf.nn.l2_normalize(v, [0, 1, 2])
 
             # calculate convolutional layer output
             b = tf.reshape(b, [1, -1, 1, 1])
